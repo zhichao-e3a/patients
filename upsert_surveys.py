@@ -34,11 +34,11 @@ for _, row in df_pre.iterrows():
 
     first_pregnancy_str     = safe_get_value(row, COL["first_preg"])
     first_pregnancy_cleaned = strip_choice(first_pregnancy_str)
-    first_pregnancy         = first_pregnancy_map.get(first_pregnancy_cleaned, 0)
+    first_pregnancy         = first_pregnancy_map.get(first_pregnancy_cleaned)
 
     num_pregnancy_str       = safe_get_value(row, COL["num_preg"])
     num_pregnancy_cleaned   = strip_choice(num_pregnancy_str)
-    num_pregnancy           = num_pregnancy_map.get(num_pregnancy_cleaned, 1)
+    num_pregnancy           = num_pregnancy_map.get(num_pregnancy_cleaned, "1")
 
     first_delivery_str      = safe_get_value(row, COL["first_deliv"])
     first_delivery_cleaned  = strip_choice(first_delivery_str)
@@ -46,11 +46,11 @@ for _, row in df_pre.iterrows():
 
     num_children_str        = safe_get_value(row, COL["num_children"])
     num_children_cleaned    = strip_choice(num_children_str)
-    num_children            = num_children_map.get(num_children_cleaned, 0)
+    num_children            = num_children_map.get(num_children_cleaned, "0")
 
     prev_preterm_str        = safe_get_value(row, COL["prev_preterm"])
     prev_preterm_cleaned    = strip_choice(prev_preterm_str)
-    prev_preterm            = previous_preterm_map.get(prev_preterm_cleaned, "No")
+    prev_preterm            = previous_preterm_map.get(prev_preterm_cleaned, "NA")
 
     smoking_history_str     = safe_get_value(row, COL["smoke_hist"])
     smoking_history_cleaned = strip_choice(smoking_history_str)
@@ -58,11 +58,11 @@ for _, row in df_pre.iterrows():
 
     still_smoking_str       = safe_get_value(row, COL["still_smoke"])
     still_smoking_cleaned   = strip_choice(still_smoking_str)
-    still_smoking           = still_smoking_map.get(still_smoking_cleaned)
+    still_smoking           = still_smoking_map.get(still_smoking_cleaned, "NA")
 
     quit_smoking_str        = safe_get_value(row, COL["quit_smoke_preg"])
     quit_smoking_cleaned    = strip_choice(quit_smoking_str)
-    quit_smoking            = quit_smoking_map.get(quit_smoking_cleaned)
+    quit_smoking            = quit_smoking_map.get(quit_smoking_cleaned, "NA")
 
     alcohol_history_str     = safe_get_value(row, COL["alcohol_hist"])
     alcohol_history_cleaned = strip_choice(alcohol_history_str)
@@ -70,39 +70,42 @@ for _, row in df_pre.iterrows():
 
     still_drinking_str      = safe_get_value(row, COL["still_drink"])
     still_drinking_cleaned  = strip_choice(still_drinking_str)
-    still_drinking          = still_drinking_map.get(still_drinking_cleaned)
+    still_drinking          = still_drinking_map.get(still_drinking_cleaned, "NA")
 
     quit_drinking_str       = safe_get_value(row, COL["quit_drink_preg"])
     quit_drinking_cleaned   = strip_choice(quit_drinking_str)
-    quit_drinking           = quit_drinking_map.get(quit_drinking_cleaned)
+    quit_drinking           = quit_drinking_map.get(quit_drinking_cleaned, "NA")
 
     drug_history_str        = safe_get_value(row, COL["drug_hist"])
     drug_history_cleaned    = strip_choice(drug_history_str)
     drug_history            = drug_history_map.get(drug_history_cleaned)
 
+    surgery_history_str     = safe_get_value(row, COL["surgery_history"])
+    surgery_history_cleaned = strip_choice(surgery_history_str)
+
     # Build record
 
     # Handle '其他' for symptoms
     record = {
-        "joined_date"                           : date_only_from_dmy(safe_get_value(row, COL["joined_date"])),
-        "name"                                  : safe_get_value(row, COL["name"]),
-        "contact_number"                        : safe_get_value(row, COL["contact"]),
-        "age"                                   : safe_get_value(row, COL["age"]),
-        "current_gestational_age"               : ga_str,
-        "current_gestational_age_total_days"    : ga_days,
-        "current_height"                        : safe_get_value(row, COL["height_cm"]),
-        "current_weight"                        : safe_get_value(row, COL["weight_jin"]),
-        "weight_before_pregnancy"               : safe_get_value(row, COL["pre_weight_jin"]),
-        "last_menstrual_date"                   : safe_get_value(row, COL["lmp"]),
-        "estimated_delivery_date"               : safe_get_value(row, COL["edd"]),
-        "first_pregnancy"                       : first_pregnancy,
-        "num_pregnancy"                         : num_pregnancy,
-        "first_delivery"                        : first_delivery,
-        "num_children"                          : num_children,
-        "last_delivery_date"                    : safe_get_value(row, COL["last_delivery_date"]),
-        "previous_preterm"                      : prev_preterm,
-        "surgery_history"                       : safe_get_value(row, COL["surgery_history"]),
-        "pregnancy_symptoms"                    : join_values(
+        "date_joined"           : date_only(safe_get_value(row, COL["joined_date"])),           # Non-empty
+        "name"                  : safe_get_value(row, COL["name"]),                             # Non-empty
+        "mobile"                : safe_get_value(row, COL["contact"]),                          # Non-empty
+        "age"                   : safe_get_value(row, COL["age"]),                              # Non-empty
+        "ga_entry_str"          : ga_str,
+        "ga_entry"              : ga_days,                                                      # Non-empty
+        "curr_height"           : safe_get_value(row, COL["height_cm"]),                        # Non-empty
+        "curr_weight"           : safe_get_value(row, COL["weight_jin"]),
+        "pre_weight"            : safe_get_value(row, COL["pre_weight_jin"]),                   # Non-empty
+        "lmp"                   : safe_get_value(row, COL["lmp"]),                              # Non-empty
+        "edd"                   : safe_get_value(row, COL["edd"], default=""),                  # Empty (defaults to "")
+        "had_pregnancy"         : "Yes" if first_pregnancy == "No" else "No",
+        "had_delivery"          : "Yes" if first_delivery == "No" else "No",
+        "n_pregnancy"           : num_pregnancy,                                                # Empty (defaults to "1")
+        "n_children"            : num_children,                                                 # Empty (defaults to "0")
+        "last_delivery_date"    : safe_get_value(row, COL["last_delivery_date"], default=""),   # Empty (defaults to "")
+        "had_preterm"           : prev_preterm,                                                 # Empty (defaults to "NA")
+        "had_surgery"           : "Yes" if surgery_history_cleaned != "没有" else "No",          # Non-empty
+        "pregnancy_symptoms"    : join_values(
             [
                 strip_choice(row[col]) for col in row.index\
                 if\
@@ -112,7 +115,7 @@ for _, row in df_pre.iterrows():
                 and not is_other_placeholder(safe_get_value(row, col))
             ]
         ),
-        "diagnosed_conditions"                  : join_values(
+        "diagnosed_conditions"  : join_values(  # Non-empty
             [
                 strip_choice(row[col]) for col in row.index\
                 if\
@@ -122,13 +125,13 @@ for _, row in df_pre.iterrows():
                 and not is_other_placeholder(safe_get_value(row, col))
             ]
         ),
-        "smoking_history"                       : smoking_history,
-        "currently_still_smoking"               : still_smoking,
-        "quit_smoking_due_to_pregnancy"         : quit_smoking,
-        "alcohol_consumption_history"           : alcohol_history,
-        "currently_still_drinking"              : still_drinking,
-        "quit_drinking_due_to_pregnancy"        : quit_drinking,
-        "drug_abuse_history"                    : drug_history
+        "smoking_history"       : smoking_history,
+        "still_smoking"         : still_smoking,
+        "quit_smoking"          : quit_smoking,
+        "alcohol_history"       : alcohol_history,
+        "still_drinking"        : still_drinking,
+        "quit_drinking"         : quit_drinking,
+        "drug_history"          : drug_history
     }
 
     if\
@@ -156,7 +159,7 @@ pre_contact_set = set() ; pre_added = 0
 
 for record in mapped_data_pre:
 
-    contact_number = record.get("contact_number")
+    contact_number = record.get("mobile")
 
     if not contact_number:
         continue
@@ -168,7 +171,7 @@ for record in mapped_data_pre:
     pre_contact_set.add(contact_number)
 
     pre_collection.update_one(
-        {"contact_number": contact_number},
+        {"mobile": contact_number},
         {"$set": record},
         upsert=True
     )
@@ -194,7 +197,7 @@ delivery_time_col       = find_col_name(cols, [r"实际.*分娩.*时间.*几点|
 ga_col                  = find_col_name(cols, [r"分娩时.*孕周.*第几周.*几天|孕周.*例如.*38.*周|孕周"])
 usage_reason_col        = find_col_name(cols, [r"使用.*主要.*目的|使用.*目的"])
 awareness_col           = find_col_name(cols, [r"使用.*期间.*(感受到|察觉).*(宫缩|收缩).*逐渐加剧"])
-influence_col           = find_col_name(cols, [r"(读数|数据).*(是否|有无).*产生.*影响.*(去医院|生产)"])
+influence_col           = find_col_name(cols, [r"(读数|数据).*(是否|有无).*(去医院|生产).*产生.*影响"])
 usefulness_col          = find_col_name(cols, [r"使用.*是否.*有助.*(监测|了解).*宝宝.*健康"])
 problems_col            = find_col_name(cols, [r"使用.*是否.*遇到过问题"])
 problems_desc_col       = find_col_name(cols, [r"简要描述.*遇到.*问题|问题.*描述"])
@@ -210,6 +213,8 @@ mapped_data_post = []
 
 for _, row in df_post.iterrows():
 
+    ga_str, ga_days = parse_ga_str(safe_get_value(row, ga_col))
+
     advantages      = collect_mrq_by_keywords(row, cols, group_keywords=["使用", "优点"])
     disadvantages   = collect_mrq_by_keywords(row, cols, group_keywords=["使用", "不足"])
     usage_reason    = safe_get_value(row, usage_reason_col)
@@ -224,34 +229,35 @@ for _, row in df_post.iterrows():
     informed_doctor         = map_choice(safe_get_value(row, informed_doc_col), informed_doctor_map) if informed_doc_col else None
 
     record = {
-        "name"                              : safe_get_value(row, name_col),
-        "contact_number"                    : safe_get_value(row, phone_col),
-        "hospitalised_date"                 : safe_get_value(row, hospitalised_col),
-        "delivery_method"                   : strip_choice(safe_get_value(row, delivery_method_col)),
-        "water_break_datetime"              : safe_get_value(row, water_break_col),
-        "duration_contr_to_birth"           : safe_get_value(row, duration_contr_col),
-        "duration_room_to_birth"            : safe_get_value(row, duration_room_col),
-        "interval_informed_to_room"         : safe_get_value(row, interval_informed_col),
-        "csect_entry_time"                  : safe_get_value(row, csect_entry_col),
-        "c_sect_reason"                     : safe_get_value(row, csect_reason_col),
-        "actual_delivery_date"              : safe_get_value(row, actual_date_col),
-        "delivery_timing"                   : safe_get_value(row, delivery_time_col),
-        "gestational_age"                   : safe_get_value(row, ga_col), # FUNCTION NOT USED
-        "modoo_usage_reason"                : usage_reason,
-        "increased_contraction_awareness"   : contraction_awareness,
-        "modoo_influence"                   : modoo_influence,
-        "modoo_usefulness_baby_monitoring"  : modoo_usefulness,
-        "modoo_advantages"                  : advantages,
-        "modoo_disadvantages"               : disadvantages,
-        "are_there_any_problems_faced"      : problems_faced,
-        "problems_faced"                    : safe_get_value(row, problems_desc_col),
-        "recommendation"                    : recommendation,
-        "reasons_for_recommending"          : safe_get_value(row, why_recommend_col),
-        "reasons_for_not_recommending"      : safe_get_value(row, why_not_recommend_col),
-        "did_ultrasound"                    : ultrasound,
-        "informed_doctor"                   : informed_doctor,
-        "doctor_reaction"                   : safe_get_value(row, reaction_col),
-        "improvement"                       : safe_get_value(row, improvement_col),
+        "name"                          : safe_get_value(row, name_col),
+        "mobile"                        : safe_get_value(row, phone_col),                           # Non-empty
+        "hospitalised_date"             : safe_get_value(row, hospitalised_col),
+        "delivery_type"                 : strip_choice(safe_get_value(row, delivery_method_col)),   # Non-empty
+        "water_break_datetime"          : safe_get_value(row, water_break_col, default=""),         # Empty (defaults to "")
+        "contraction_duration"          : safe_get_value(row, duration_contr_col),
+        "birthroom_duration"            : safe_get_value(row, duration_room_col),
+        "birthroom_interval_duration"   : safe_get_value(row, interval_informed_col),
+        "csect_entry_time"              : safe_get_value(row, csect_entry_col),
+        "csect_reason"                  : safe_get_value(row, csect_reason_col),
+        "add"                           : safe_get_value(row, actual_date_col),                     # Non-empty
+        "delivery_time"                 : safe_get_value(row, delivery_time_col),                   # Non-empty
+        "ga_exit_str"                   : ga_str,
+        "ga_exit"                       : ga_days,                                                  # Non-empty
+        "modoo_usage_reason"            : usage_reason,
+        "modoo_influence"               : modoo_influence,
+        "modoo_usefulness"              : modoo_usefulness,
+        "modoo_advantages"              : advantages,
+        "modoo_disadvantages"           : disadvantages,
+        "increased_awareness"           : contraction_awareness,
+        "had_problems"                  : problems_faced,
+        "problems_faced"                : safe_get_value(row, problems_desc_col),
+        "will_recommend"                : recommendation,
+        "reasons_for_recommend"         : safe_get_value(row, why_recommend_col),
+        "reasons_for_not_recommend"     : safe_get_value(row, why_not_recommend_col),
+        "had_ultrasound"                : ultrasound,
+        "informed_doctor"               : informed_doctor,
+        "doctor_reaction"               : safe_get_value(row, reaction_col),
+        "improvement"                   : safe_get_value(row, improvement_col),
     }
 
     mapped_data_post.append(record)
@@ -260,7 +266,7 @@ post_contact_set = set() ; post_added = 0
 
 for record in mapped_data_post:
 
-    contact_number = record.get("contact_number")
+    contact_number = record.get("mobile")
 
     if not contact_number:
         continue
@@ -272,7 +278,7 @@ for record in mapped_data_post:
     post_contact_set.add(contact_number)
 
     post_collection.update_one(
-        {"contact_number": contact_number},
+        {"mobile": contact_number},
         {"$set": record},
         upsert=True
     )

@@ -16,17 +16,17 @@ def find_col_name(cols, patterns):
 
     return None
 
-def safe_get_value(row, col):
+def safe_get_value(row, col, default=""):
     """
     Ensure that all values read are strings
     Ensure that null/none fields are still returned as empty strings
     """
 
-    value = row.get(col, "")
+    value = row.get(col, default)
 
     # Handle null values
     if pd.isna(value):
-        return ""
+        return default
 
     return str(value).strip()
 
@@ -139,7 +139,7 @@ def parse_ga_str(ga_str):
 
     return ga_str, week*7+day
 
-def date_only_from_dmy(x: str) -> str:
+def date_only(x: str) -> str:
     """Input like '31/8/2025 21:16' -> '2025-08-31' (or '' if invalid)."""
     ts = pd.to_datetime(x, errors="coerce", dayfirst=True)
     return ts.strftime("%Y-%m-%d") if pd.notna(ts) else ""
@@ -158,19 +158,19 @@ def normalize_commas(s: str) -> str:
     return s.strip(", ").strip()
 
 num_children_map = {
-    "一": 1,
-    "两": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
+    "一": "1",
+    "两": "2",
+    "三": "3",
+    "四": "4",
+    "五": "5",
     "多过六个": ">=6"
 }
 
 num_pregnancy_map = {
-    "二": 2,
-    "三": 3,
-    "四": 4,
-    "五": 5,
+    "二": "2",
+    "三": "3",
+    "四": "4",
+    "五": "5",
     "多过六次": ">=6"
 }
 
@@ -220,6 +220,11 @@ quit_drinking_map = {
 }
 
 drug_history_map = {
+    "有": "Yes",
+    "没有": "No"
+}
+
+surgery_history_map = {
     "有": "Yes",
     "没有": "No"
 }
