@@ -96,13 +96,13 @@ for _, row in df_pre.iterrows():
         "curr_height"           : safe_get_value(row, COL["height_cm"]),                        # Non-empty
         "curr_weight"           : safe_get_value(row, COL["weight_jin"]),
         "pre_weight"            : safe_get_value(row, COL["pre_weight_jin"]),                   # Non-empty
-        "lmp"                   : safe_get_value(row, COL["lmp"]),                              # Non-empty
+        "last_menstrual"        : safe_get_value(row, COL["last_menstrual"]),                   # Non-empty
         "edd"                   : safe_get_value(row, COL["edd"], default=""),                  # Empty (defaults to "")
         "had_pregnancy"         : "Yes" if first_pregnancy == "No" else "No",
         "had_delivery"          : "Yes" if first_delivery == "No" else "No",
         "n_pregnancy"           : num_pregnancy,                                                # Empty (defaults to "1")
         "n_children"            : num_children,                                                 # Empty (defaults to "0")
-        "last_delivery_date"    : safe_get_value(row, COL["last_delivery_date"], default=""),   # Empty (defaults to "")
+        "last_delivery"    : safe_get_value(row, COL["last_delivery_date"], default="NA"),      # Empty (defaults to "NA")
         "had_preterm"           : prev_preterm,                                                 # Empty (defaults to "NA")
         "had_surgery"           : "Yes" if surgery_history_cleaned != "没有" else "No",          # Non-empty
         "pregnancy_symptoms"    : join_values(
@@ -170,13 +170,14 @@ for record in mapped_data_pre:
 
     pre_contact_set.add(contact_number)
 
-    pre_collection.update_one(
+    res = pre_collection.update_one(
         {"mobile": contact_number},
         {"$set": record},
         upsert=True
     )
 
-    pre_added += 1
+    if res.upserted_id is not None or res.modified_count > 0:
+        pre_added += 1
 
 ######################################## POST-SURVEY ########################################
 
@@ -277,13 +278,14 @@ for record in mapped_data_post:
 
     post_contact_set.add(contact_number)
 
-    post_collection.update_one(
+    res = post_collection.update_one(
         {"mobile": contact_number},
         {"$set": record},
         upsert=True
     )
 
-    post_added += 1
+    if res.upserted_id is not None or res.modified_count > 0:
+        post_added += 1
 
 print(f"Upserted {pre_added} records into MongoDB collection 'patient_presurvey'")
 print(f"Upserted {post_added} records into MongoDB collection 'patient_postsurvey'")
