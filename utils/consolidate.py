@@ -15,6 +15,15 @@ def _try_float(x: Any) -> Optional[float]:
         print(e)
         return None
 
+def delivery_type_map(s: Any) -> Any:
+    s = "" if s is None else str(s)
+    if "顺产" in s:
+        return "natural"
+    if "剖腹产（剖宫产）" in s:
+        return "c-section"
+    if "紧急剖腹产" in s:
+        return "emergency c-section"
+    return np.nan
 
 def bmi_choose_weight_kg(height_cm: Any, weight_val: Any) -> Optional[float]:
     """
@@ -49,20 +58,8 @@ def bmi_choose_weight_kg(height_cm: Any, weight_val: Any) -> Optional[float]:
         return round(b2, 1)
     return round(b1, 1) if b1 is not None else None
 
-
-def parity_from_num_children(num_children):
-    """0 -> Nulliparous, else -> Multiparous (missing/invalid counts as 'else')."""
-    try:
-        n = float(str(num_children).strip())
-    except Exception as e:
-        print(e)
-        return "Multiparous"
-    return "Nulliparous" if n == 0 else "Multiparous"
-
-
 def flag_contains_1_0(text: Any, needle: str) -> int:
     return 1 if (text is not None and needle in str(text)) else 0
-
 
 def ga_simple_to_float(x: Any) -> float:
     try:
@@ -72,59 +69,19 @@ def ga_simple_to_float(x: Any) -> float:
         print(e)
         return np.nan
 
-
-def append_two(a: Any, b: Any, sep: str = " ") -> str:
-    """Join two strings with a separator; skip blanks."""
-    parts: list[str] = []
-    for v in (a, b):
-        if v is None:
-            continue
-        s = str(v).strip()
-        if s:
-            parts.append(s)
-    return sep.join(parts)
-
-
-def parse_water_break_datetime(wb: Any) -> Optional[pd.Timestamp]:
-    """Expect 'YYYY-MM-DD HH:MM' or '' from Mongo; return Timestamp or None."""
-    s = "" if wb is None else str(wb).strip()
-    if not s:
-        return None
-    ts = pd.to_datetime(s, format="%Y-%m-%d %H:%M", errors="coerce")
-    return ts if pd.notna(ts) else None
-
-
 def compute_onset_from_posts_row(row: pd.Series) -> str:
     """Onset = parsed water_break_datetime, else ''."""
+
+    def parse_water_break_datetime(wb: Any) -> Optional[pd.Timestamp]:
+        """Expect 'YYYY-MM-DD HH:MM' or '' from Mongo; return Timestamp or None."""
+        s = "" if wb is None else str(wb).strip()
+        if not s:
+            return None
+        t = pd.to_datetime(s, format="%Y-%m-%d %H:%M", errors="coerce")
+        return t if pd.notna(t) else None
+
     ts = parse_water_break_datetime(row.get("water_break_datetime"))
     return ts.strftime("%Y-%m-%d %H:%M") if ts is not None else ""
-
-
-# ---------- Read features (first/last encounter) ----------
-def pick_first_last_dates(measurements: Any) -> tuple[str, str]:
-    """Return ('YYYY-MM-DD' or '', 'YYYY-MM-DD' or '') from measurements[] by first/last valid date."""
-    if not isinstance(measurements, list) or not measurements:
-        return "", ""
-
-    # first valid
-    first_str = ""
-    for item in measurements:
-        d = item.get("date") if isinstance(item, dict) else item
-        ts = parse_date_ymd(d)
-        if isinstance(ts, pd.Timestamp) and not pd.isna(ts):
-            first_str = ts.strftime("%Y-%m-%d")
-            break
-
-    # last valid
-    last_str = ""
-    for item in reversed(measurements):
-        d = item.get("date") if isinstance(item, dict) else item
-        ts = parse_date_ymd(d)
-        if isinstance(ts, pd.Timestamp) and not pd.isna(ts):
-            last_str = ts.strftime("%Y-%m-%d")
-            break
-
-    return first_str, last_str
 
 ######################################## HISTORICAL ########################################
 

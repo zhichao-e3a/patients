@@ -15,135 +15,104 @@ post_collection = db["patient_postsurvey"]
 out_collection  = db["patients_unified"]
 
 # Read required fields
-pre_docs = list(pre_collection.find({}, {
-    "_id": 0,
-    "contact_number": 1,
-    "joined_date": 1,
-    "estimated_delivery_date": 1,  # 'YYYY-MM-DD'
-    "num_children": 1,
-    "current_height": 1,
-    "weight_before_pregnancy": 1,
-    "diagnosed_conditions": 1,
-    "age": 1,
-    "last_menstrual_date": 1,  # 'YYYY-MM-DD'
-    "current_gestational_age": 1,
-}))
-
-post_docs = list(post_collection.find({}, {
-    "_id": 0,
-    "contact_number": 1,
-    "actual_delivery_date": 1,  # 'YYYY-MM-DD'
-    "delivery_timing": 1,
-    "delivery_method": 1,
-    "gestational_age": 1,
-    "water_break_datetime": 1,
-}))
-
-print(f"pre:  {len(pre_docs)} docs from {DB_NAME}.patient_presurvey")
-print(f"post: {len(post_docs)} docs from {DB_NAME}.patient_postsurvey")
-
-# DataFrames
-pre = pd.DataFrame(pre_docs)
-post = pd.DataFrame(post_docs)
-
-if pre.empty or "contact_number" not in pre.columns:
-    raise SystemExit("No presurvey docs or missing 'contact_number' in presurvey.")
-
-# Normalize join key & dedup
-pre["contact_number"] = pre["contact_number"].astype(str).str.strip()
-if not post.empty:
-    post["contact_number"] = post["contact_number"].astype(str).str.strip()
-
-pre = pre.drop_duplicates("contact_number", keep="last")
-post = post.drop_duplicates("contact_number", keep="last") if not post.empty else post
-
-# ---- derive from pre ----
-pres = pre.copy()
-pres["patient_id"] = pres["contact_number"]
-pres["date_joined"] = pres["joined_date"].apply(parse_date_ymd)
-pres["estimated_delivery_date"] = pres["estimated_delivery_date"].apply(parse_date_ymd)
-pres["parity"] = pres["num_children"].apply(parity_from_num_children)
-pres["bmi"] = pres.apply(
-    lambda r: bmi_choose_weight_kg(r.get("current_height"), r.get("weight_before_pregnancy")), axis=1
-)
-pres["gdm"] = pres["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠糖尿病"))
-pres["pih"] = pres["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠高血压"))
-pres["age"] = pres["age"]
-pres["last_menstrual_period"] = pres["last_menstrual_date"].apply(parse_date_ymd)
-pres["ga_entry_weeks"] = (
-    pres["current_gestational_age"].apply(ga_simple_to_float)
-    if "current_gestational_age" in pres.columns else np.nan
-)
-
-# ---- derive from post ----
-posts = post.copy()
-if not posts.empty:
-    def delivery_type_map(s: Any) -> Any:
-        s = "" if s is None else str(s)
-        if "顺产" in s:
-            return "natural"
-        if "剖腹产（剖宫产）" in s:
-            return "c-section"
-        if "紧急剖腹产" in s:
-            return "emergency c-section"
-        return np.nan
-
-    posts["delivery_type"] = posts["delivery_method"].apply(delivery_type_map)
-    posts["delivery_datetime"] = posts.apply(
-        lambda r: append_two(r.get("actual_delivery_date"), r.get("delivery_timing")), axis=1
+pre_docs = list(
+    pre_collection.find(
+        {},
+        {
+            "_id"                   : 0,
+            "date_joined"           : 1,
+            "name"                  : 1,
+            "mobile"                : 1,
+            "age"                   : 1,
+            "ga_entry"              : 1,
+            "curr_height"           : 1,
+            "pre_weight"            : 1,
+            "last_menstrual"        : 1,
+            "edd"                   : 1,
+            "n_pregnancy"           : 1,
+            "n_children"            : 1,
+            "last_delivery"         : 1,
+            "had_preterm"           : 1,
+            "had_surgery"           : 1,
+            "diagnosed_conditions"  : 1,
+        }
     )
-    posts["ga_exit_weeks"] = posts["gestational_age"].apply(ga_simple_to_float)
+)
 
-    posts["onset_datetime"] = posts.apply(compute_onset_from_posts_row, axis=1)
+post_docs = list(
+    post_collection.find(
+        {},
+        {
+            "_id"                   : 0,
+            "mobile"                : 1,
+            "delivery_type"         : 1,
+            "add"                   : 1,
+            "delivery_time"         : 1,
+            "ga_exit"               : 1,
+            "water_break_datetime"  : 1
+        }
+    )
+)
 
-# ---- join pres + posts ----
-join_cols = ["contact_number", "delivery_datetime", "ga_exit_weeks", "delivery_type", "onset_datetime"]
-if not posts.empty and all(c in posts.columns for c in join_cols):
-    merged = pres.merge(posts[join_cols], on="contact_number", how="left")
-else:
-    merged = pres.merge(pd.DataFrame(columns=join_cols), on="contact_number", how="left")
+print(f"Retrieved {len(pre_docs)} docs from patient_presurvey")
+print(f"Retrieved {len(post_docs)} docs from patient_postsurvey")
 
-# ---- final schema ----
-out = pd.DataFrame({
-    "patient_id": merged["patient_id"],
-    "date_joined": merged["date_joined"],
-    "estimated_delivery_date": merged["estimated_delivery_date"],
-    "parity": merged["parity"],
-    "bmi": merged["bmi"],
-    "gdm": merged["gdm"],  # 0 or 1
-    "pih": merged["pih"],  # 0 or 1
-    "age": merged["age"],
-    "last_menstrual_period": merged["last_menstrual_period"],
-    "onset_datetime": merged["onset_datetime"],  # 'YYYY-MM-DD HH:MM' or ''
-    "delivery_datetime": merged["delivery_datetime"],  # 'YYYY-MM-DD HH:MM' or ''
-    "ga_entry_weeks": merged["ga_entry_weeks"],
-    "ga_exit_weeks": merged["ga_exit_weeks"],
-    "recruitment_type": "recruited",  # cause this code is for recruited patients only
-    "delivery_type": merged["delivery_type"],
-})
+pre = pd.DataFrame(pre_docs) ; post = pd.DataFrame(post_docs)
 
-# Ensure date columns render as 'YYYY-MM-DD'
-for col in ["estimated_delivery_date", "last_menstrual_period", "date_joined"]:
-    if pd.api.types.is_datetime64_any_dtype(out[col]):
-        out[col] = out[col].dt.strftime("%Y-%m-%d")
-    out[col] = out[col].fillna("")
+# pre     = pre.drop_duplicates("contact_number", keep="last")
+# post    = post.drop_duplicates("contact_number", keep="last") if not post.empty else post
 
-records = out.replace({np.nan: None}).to_dict(orient="records")
+# Construct new dataframe for pre-survey fields
+new_pre = pd.DataFrame()
 
-# Optional: ensure a unique index on patient_id (ignore error if it already exists)
-try:
-    out_collection.create_index("patient_id", unique=True)
-except Exception as e:
-    print(e)
-    pass
+new_pre["date_joined"]      = pre["date_joined"]
+new_pre["name"]             = pre["name"]
+new_pre["mobile"]           = pre["mobile"]
+new_pre["age"]              = pre["age"]
+new_pre["ga_entry"]         = pre["ga_entry"]
+new_pre["last_menstrual"]   = pre["last_menstrual"]
+new_pre["edd"]              = pre["edd"]
+new_pre["n_pregnancy"]      = pre["n_pregnancy"]
+new_pre["n_children"]       = pre["n_children"]
+new_pre["last_delivery"]    = pre["last_delivery"]
+new_pre["had_preterm"]      = pre["had_preterm"]
+new_pre["had_surgery"]      = pre["had_surgery"]
+new_pre["bmi"]              = pre.apply(
+    lambda x: bmi_choose_weight_kg(x.get("curr_height"), x.get("pre_weight")),
+    axis=1
+)
+new_pre["gdm"]              = pre["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠糖尿病"))
+new_pre["pih"]              = pre["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠高血压"))
+
+# Construct new dataframe for post-survey fields
+new_post = pd.DataFrame()
+
+new_post["mobile"]          = post["mobile"]
+new_post["delivery_type"]   = post["delivery_type"].apply(delivery_type_map)
+new_post["ga_exit"]         = post["ga_exit"]
+new_post["onset"]           = post.apply(compute_onset_from_posts_row, axis=1)
+new_post["add"]             = post.apply(
+    lambda r: f"{r.get("add")} {r.get("delivery_time")}", axis=1
+)
+
+merged          = new_pre.merge(new_post, on="mobile", how="left")
+merged["type"]  = "recruited"
 
 upserts = 0
-for rec in records:
-    print(rec)
-    pid = rec.get("patient_id")
+for rec in merged.replace({np.nan: None}).to_dict("records"):
+
+    pid = rec.get("mobile")
+
     if not pid:
+        print("No Mobile:", rec)
         continue
-    res = out_collection.update_one({"patient_id": pid}, {"$set": rec}, upsert=True)
+
+    res = out_collection.update_one(
+        {"mobile": pid},
+        {"$set": rec},
+        upsert=True
+    )
+
     if res.upserted_id is not None or res.modified_count > 0:
         upserts += 1
 
