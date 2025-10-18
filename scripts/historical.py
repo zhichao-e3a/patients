@@ -1,97 +1,81 @@
-"""
-BEFORE RUNNING THIS CODE:
-1) Add historical patients datasets into the "historical_data.csv"
-2) Some datasets (EDD, bmi, age, ga_entry_weeks, ga_exit_weeks) can be obtained from the SQL database
-"""
-
-from config.configs import DEFAULT_MONGO_CONFIG
+from database.queries import HISTORICAL_QUERY
+from database.SQLDBConnector import SQLDBConnector
+from database.MongoDBConnector import MongoDBConnector
 from utils.consolidate import *
 
+import asyncio
 import pandas as pd
 from pathlib import Path
-from pymongo import MongoClient
 
-DB_HOST = DEFAULT_MONGO_CONFIG["DB_HOST"]
-DB_NAME = DEFAULT_MONGO_CONFIG["DB_NAME"]
+ROOT    = Path(__file__).parent.parent
 
-client = MongoClient(DB_HOST)
-db = client[DB_NAME]
+sql     = SQLDBConnector()
+mongo   = MongoDBConnector(mode="remote")
 
-out_collection  = db["patients_unified"]
+hist_df             = pd.read_excel(ROOT / "datasets" / "historical_metadata.xlsx")
+hist_df['mobile']   = hist_df['mobile'].astype(str)
 
-ROOT    = Path(__file__).parent
-PATH  = ROOT / "datasets" / "historical_data.csv"
+mobile_query_str = ",".join([f"'{i}'" for i in hist_df["mobile"].tolist()])
 
-df = pd.read_csv(PATH, dtype=str)
-df = df.loc[:, ~df.columns.str.contains(r"^Unnamed")]
+hist_sql = sql.query_to_dataframe(query=HISTORICAL_QUERY.format(mobile_query_str=mobile_query_str))
+print(f"{len(hist_sql)} patient records fetched")
 
-# Strip hidden whitespace from column names
-df.columns = df.columns.str.strip()
+hist_pivot = hist_sql.pivot(
+    index=[i for i in hist_sql.columns if i not in ['record_type', 'record_answer']],
+    columns='record_type',
+    values='record_answer'
+).reset_index()
 
-# Replace NaN with None
-df = df.replace({np.nan: None})
+merged = hist_df.merge(hist_pivot, on='mobile', how='left')
 
-# Ensure ID
-if "patient_id" not in df.columns:
-    if "contact_number" in df.columns:
-        df["patient_id"] = df["contact_number"]
-    else:
-        raise SystemExit("CSV must contain 'patient_id' or 'contact_number'")
+new_records = []
+for _, row in merged.iterrows():
 
-# Add recruitment_type if missing
-if "recruitment_type" not in df.columns:
-    df["recruitment_type"] = "historical"
+    basic_info_str  = row['basic_info']
+    conclusion_str  = row['conclusion'] if pd.notna(row['conclusion']) else None
+    ga_entry        = extract_gest_age(conclusion_str, basic_info_str)
+    entry_time      = row['earliest']
+    exit_time       = row['add']
+    ga_exit         = int(ga_entry + (exit_time - entry_time).days) if pd.notna(exit_time) else None
 
-# Convert numeric fields
-if "age" in df.columns:
-    df["age"] = df["age"].apply(to_int_or_none)
-if "bmi" in df.columns:
-    df["bmi"] = df["bmi"].apply(to_float_or_none)
-if "ga_entry_weeks" in df.columns:
-    df["ga_entry_weeks"] = df["ga_entry_weeks"].apply(to_float_or_none)
-if "ga_exit_weeks" in df.columns:
-    df["ga_exit_weeks"] = df["ga_exit_weeks"].apply(to_float_or_none)
-if "pih" in df.columns:
-    df["pih"] = df["pih"].apply(to_int_or_none)
-if "gdm" in df.columns:
-    df["gdm"] = df["gdm"].apply(to_int_or_none)
+    # 0='0 pregnancies', 1='1 pregnancies', 2='2 pregnancies', 3='>2 pregnancies'
+    # Count current pregnancy as well so treat 0 and 1 as same
+    preg_count  = row[1.0]
+    # 0='有', 1='无', 2='未知'
+    had_misc    = row[2.0]
+    gdm         = row[4.0]
+    pih         = row[5.0]
+    had_preterm = row[8.0]
+    had_surgery = row[13.0]
 
-# ---- Normalize date-only fields to 'YYYY-MM-DD' ----
-# Add any other date-only cols you want here.
-date_only_cols = ["date_joined", "first_encounter_date", "last_encounter_date", "estimated_delivery_date"]
-for col in date_only_cols:
-    if col in df.columns:
-        df[col] = df[col].apply(to_ymd_or_none)
-
-# If first_encounter_date missing, copy from date_joined (optional)
-if "first_encounter_date" in df.columns and "date_joined" in df.columns:
-    df["first_encounter_date"] = df["first_encounter_date"].where(
-        df["first_encounter_date"].notna() & (df["first_encounter_date"].astype(str).str.strip() != ""),
-        df["date_joined"]
+    bmi = bmi_choose_weight_kg(
+        height_cm = row['height'],
+        weight_val = row['old_weight']
     )
 
-# ---- Normalize datetime fields to 'YYYY-MM-DD HH:MM' ----
-datetime_cols = ["delivery_datetime", "onset_datetime"]
-for col in datetime_cols:
-    if col in df.columns:
-        df[col] = df[col].apply(to_ymd_hm_or_none)
+    record = {
+        'type'          : 'historical',
+        'date_joined'   : row['reg_time'].to_pydatetime().strftime("%Y-%m-%d"),
+        'name'          : row['name'] if pd.notna(row['name']) else None,
+        'mobile'        : row['mobile'],
+        'age'           : str(int(row['age'])) if pd.notna(row['age']) else None,
+        'ga_entry'      : ga_entry,
+        'ga_exit'       : ga_exit,
+        'bmi'           : bmi if pd.notna(bmi) else None,
+        'edd'           : row['edd'].strftime("%Y-%m-%d") if pd.notna(row['edd']) else None,
+        'had_pregnancy' : 1 if (preg_count > 1) else 0,
+        'had_preterm'   : 1 if had_preterm == 0 else 0,
+        'had_surgery'   : 1 if had_surgery == 0 else 0,
+        'gdm'           : 1 if gdm == 0 else 0,
+        'pih'           : 1 if pih == 0 else 0,
+        'delivery_type' : row['delivery_type'],
+        'add'           : row['add'].to_pydatetime().strftime("%Y-%m-%d %H:$M"),
+        'onset'         : row['onset'].to_pydatetime().strftime("%Y-%m-%d %H:$M") if pd.notna(row['onset']) else None
+    }
 
-# Convert to dict
-records = df.to_dict(orient="records")
+    new_records.append(record)
 
-try:
-    out_collection.create_index("patient_id", unique=True)
-except Exception as e:
-    print(e)
-    pass
-
-upserts = 0
-for rec in records:
-    pid = rec.get("patient_id")
-    if not pid:
-        continue
-    res = out_collection.update_one({"patient_id": pid}, {"$set": rec}, upsert=True)
-    if res.upserted_id is not None or res.modified_count > 0:
-        upserts += 1
-
-print(f"Upserted {upserts} doc(s) into 'patients_unified'")
+asyncio.run(
+    mongo.upsert_documents(new_records, coll_name='patients_unified', id_fields=['mobile'])
+)
+print(f"{len(new_records)} consolidated patients upserted")

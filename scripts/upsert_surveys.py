@@ -1,4 +1,4 @@
-from config.configs import DEFAULT_MONGO_CONFIG
+from config.configs import REMOTE_MONGO_CONFIG
 from utils.surveys import *
 
 import pandas as pd
@@ -6,8 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from pymongo import MongoClient
 
-DB_HOST = DEFAULT_MONGO_CONFIG["DB_HOST"]
-DB_NAME = DEFAULT_MONGO_CONFIG["DB_NAME"]
+DB_HOST = REMOTE_MONGO_CONFIG["DB_HOST"]
+DB_NAME = REMOTE_MONGO_CONFIG["DB_NAME"]
 
 client = MongoClient(DB_HOST)
 db = client[DB_NAME]
@@ -15,10 +15,11 @@ db = client[DB_NAME]
 pre_collection  = db["patient_presurvey"]
 post_collection = db["patient_postsurvey"]
 
-date = datetime.today().strftime("%y%m%d")
+# date = datetime.today().strftime("%y%m%d")
+date = "251014"
 print(f"Processing surveys for {date}")
 
-ROOT    = Path(__file__).parent
+ROOT    = Path(__file__).parent.parent
 PRE_IN  = ROOT / "datasets" / f"{date}_pre_survey.csv"
 POST_IN = ROOT / "datasets" / f"{date}_post_survey.csv"
 df_pre  = pd.read_csv(PRE_IN, encoding='utf-8')
@@ -102,7 +103,7 @@ for _, row in df_pre.iterrows():
         "had_delivery"          : "Yes" if first_delivery == "No" else "No",
         "n_pregnancy"           : num_pregnancy,                                                # Empty (defaults to "1")
         "n_children"            : num_children,                                                 # Empty (defaults to "0")
-        "last_delivery"    : safe_get_value(row, COL["last_delivery_date"], default="NA"),      # Empty (defaults to "NA")
+        "last_delivery"         : safe_get_value(row, COL["last_delivery_date"], default="NA"),      # Empty (defaults to "NA")
         "had_preterm"           : prev_preterm,                                                 # Empty (defaults to "NA")
         "had_surgery"           : "Yes" if surgery_history_cleaned != "没有" else "No",          # Non-empty
         "pregnancy_symptoms"    : join_values(
