@@ -1,7 +1,6 @@
 # Patients Data
 
-A lightweight, modular ETL pipeline for consolidating patient and survey data into MongoDB (and optionally MySQL).  
-This repository provides database connectors, configuration management, and orchestration scripts.  
+Script for consolidating survey and patient data into MongoDB.   
 The main entrypoint is [`main.py`](./main.py), which runs the full data ingestion sequence.
 
 ---
@@ -39,7 +38,17 @@ pip install -r requirements.txt
 
 ---
 
-## ▶️ Running the Pipeline
+## ▶️ Running the Main Script
+
+```bash
+python main.py --mode remote --date {yymmdd}
+```
+
+`--mode`: 'remote' or 'local' 
+
+`--date`: Optional ; provide in 'yymmdd' format, defaults to today
+
+### Execution
 
 `main.py` is the **entrypoint** and executes these scripts in sequence:
 
@@ -49,17 +58,7 @@ pip install -r requirements.txt
 | 2️⃣  | `recruited.py`      | Upserts recruited patient information         |
 | 3️⃣  | `historical.py`     | Upserts historical patient information        |
 
-### Basic usage
-
-`--mode`: 'remote' or 'local' 
-
-`--date`: Optional ; provide in 'yymmdd' format, defaults to today
-
 **NOTE: Pre and Post survey data for the given date must exist in `./datasets`**
-
-```bash
-python main.py --mode remote --date {yymmdd}
-```
 
 ---
 
