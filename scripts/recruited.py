@@ -1,10 +1,16 @@
+import argparse
+
 from database.MongoDBConnector import MongoDBConnector
 from utils.consolidate import *
 
 import asyncio
 import pandas as pd
 
-mongo = MongoDBConnector(mode='remote')
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", required=True, choices=['local', 'remote'])
+mode = parser.parse_args().mode
+
+mongo = MongoDBConnector(mode=mode)
 
 pre_docs = asyncio.run(
     mongo.get_all_documents(
@@ -41,10 +47,8 @@ post_docs = asyncio.run(
         }
     )
 )
-out_collection  = mongo.get_all_documents("patients_unified")
 
-print(f"{len(pre_docs)} pre-survey records retrieved")
-print(f"{len(post_docs)} post-survey records retrieved")
+print(f"{len(pre_docs)} pre-survey records retrieved ; {len(post_docs)} post-survey records retrieved")
 
 pre = pd.DataFrame(pre_docs) ; post = pd.DataFrame(post_docs)
 
@@ -94,4 +98,4 @@ asyncio.run(
     )
 )
 
-print(f"{len(new_records)} consolidated patients upserted")
+print(f"Recruited: {len(new_records)} consolidated patients upserted")

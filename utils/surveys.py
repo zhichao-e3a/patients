@@ -246,7 +246,7 @@ COL = {
     "num_children": "14.您已经有几个孩子了？",
     "last_delivery_date": "15.最近一次分娩大概是什么时候？",
     "prev_preterm": "16.上一次怀孕有出现早产吗？",
-    "surgery_history": "17.您是否做过剖腹产或子宫相关手术？[选项填空]",
+    "surgery_history": "17.您是否做过剖腹产或子宫相关手术？",
 
     # MRQ groups
     "symptoms_prefix": "18.您现在有没有以下不适？",

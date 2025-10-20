@@ -1,3 +1,5 @@
+import argparse
+
 from database.queries import HISTORICAL_QUERY
 from database.SQLDBConnector import SQLDBConnector
 from database.MongoDBConnector import MongoDBConnector
@@ -7,11 +9,14 @@ import asyncio
 import pandas as pd
 from pathlib import Path
 
-ROOT    = Path(__file__).parent.parent
+parser = argparse.ArgumentParser()
+parser.add_argument("--mode", type=str, required=True, choices=["local", "remote"])
+mode = parser.parse_args().mode
 
 sql     = SQLDBConnector()
-mongo   = MongoDBConnector(mode="remote")
+mongo   = MongoDBConnector(mode=mode)
 
+ROOT                = Path(__file__).parent.parent
 hist_df             = pd.read_excel(ROOT / "datasets" / "historical_metadata.xlsx")
 hist_df['mobile']   = hist_df['mobile'].astype(str)
 
@@ -78,4 +83,4 @@ for _, row in merged.iterrows():
 asyncio.run(
     mongo.upsert_documents(new_records, coll_name='patients_unified', id_fields=['mobile'])
 )
-print(f"{len(new_records)} consolidated patients upserted")
+print(f"Historical: {len(new_records)} consolidated patients upserted")

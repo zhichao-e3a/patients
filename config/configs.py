@@ -31,7 +31,7 @@ MONGO_CONFIG = {
     'DB_NAME' : os.getenv("MONGO_NAME")
 }
 
-DEFAULT_MONGO_CONFIG = {
+REMOTE_MONGO_CONFIG = {
     "DB_HOST"   : os.getenv("MONGO_URL_E3A"),
     "DB_NAME"   : os.getenv("MONGO_NAME_E3A")
 }

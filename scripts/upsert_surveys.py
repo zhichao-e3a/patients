@@ -1,22 +1,22 @@
 from config.configs import REMOTE_MONGO_CONFIG
 from utils.surveys import *
 
+import argparse
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from pymongo import MongoClient
 
-DB_HOST = REMOTE_MONGO_CONFIG["DB_HOST"]
-DB_NAME = REMOTE_MONGO_CONFIG["DB_NAME"]
-
-client = MongoClient(DB_HOST)
-db = client[DB_NAME]
-
+DB_HOST         = REMOTE_MONGO_CONFIG["DB_HOST"]
+DB_NAME         = REMOTE_MONGO_CONFIG["DB_NAME"]
+client          = MongoClient(DB_HOST)
+db              = client[DB_NAME]
 pre_collection  = db["patient_presurvey"]
 post_collection = db["patient_postsurvey"]
 
-# date = datetime.today().strftime("%y%m%d")
-date = "251014"
+parser = argparse.ArgumentParser()
+parser.add_argument('--date', type=str, required=False, default=datetime.today().strftime("%y%m%d"))
+date = parser.parse_args().date
 print(f"Processing surveys for {date}")
 
 ROOT    = Path(__file__).parent.parent
