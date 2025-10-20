@@ -43,11 +43,11 @@ pip install -r requirements.txt
 
 `main.py` is the **entrypoint** and executes these scripts in sequence:
 
-| Step | Script              | Description                                             |
-| ---- | ------------------- | ------------------------------------------------------- |
-| 1️⃣  | `upsert_surveys.py` | Fetches and upserts the latest patient survey responses |
-| 2️⃣  | `recruited.py`      | Updates "recruited" (active) cohort information         |
-| 3️⃣  | `historical.py`     | Backfills and reconciles historical patient records     |
+| Step | Script              | Description                                   |
+| ---- | ------------------- |-----------------------------------------------|
+| 1️⃣  | `upsert_surveys.py` | Upserts patient pre and post survey responses |
+| 2️⃣  | `recruited.py`      | Upserts recruited patient information         |
+| 3️⃣  | `historical.py`     | Upserts historical patient information        |
 
 ### Basic usage
 
@@ -69,8 +69,8 @@ You can also run scripts independently for testing or partial updates:
 
 ```bash
 python -m scripts.upsert_surveys --date {yymmdd}
-python -m scripts.recruited
-python -m scripts.historical
+python -m scripts.recruited --mode remote
+python -m scripts.historical --mode remote
 ```
 
 ---
