@@ -25,7 +25,7 @@ pre_docs = asyncio.run(
             "curr_height"           : 1,
             "pre_weight"            : 1,
             "edd"                   : 1,
-            "n_pregnancy"           : 1,
+            "had_pregnancy"           : 1,
             "had_preterm"           : 1,
             "had_surgery"           : 1,
             "diagnosed_conditions"  : 1,
@@ -52,9 +52,6 @@ print(f"{len(pre_docs)} pre-survey records retrieved ; {len(post_docs)} post-sur
 
 pre = pd.DataFrame(pre_docs) ; post = pd.DataFrame(post_docs)
 
-# pre     = pre.drop_duplicates("contact_number", keep="last")
-# post    = post.drop_duplicates("contact_number", keep="last") if not post.empty else post
-
 # Construct new dataframe for pre-survey fields
 new_pre = pd.DataFrame()
 
@@ -68,7 +65,7 @@ new_pre["bmi"]              = pre.apply(
     axis=1
 )
 new_pre["edd"]              = pre["edd"]
-new_pre["had_pregnancy"]    = pre["n_pregnancy"].apply(lambda s: 1 if (s != "0" and s != "1") else 0)
+new_pre["had_pregnancy"]    = pre["had_pregnancy"].apply(lambda s: 1 if (s == "Yes") else 0)
 new_pre["had_preterm"]      = pre["had_preterm"].apply(lambda s: 1 if (s == "Yes") else 0)
 new_pre["had_surgery"]      = pre["had_surgery"].apply(lambda s: 1 if (s == "Yes") else 0)
 new_pre["gdm"]              = pre["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠糖尿病"))
