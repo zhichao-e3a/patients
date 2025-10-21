@@ -166,7 +166,7 @@ for _, patient in merged.iterrows():
         ga_exit_last = ga_entry + (exit_time_last-earliest).days
 
     record = {
-        'type'          : 'recruited',
+        'type'          : 'rec',
         'date_joined'   : earliest.strftime("%Y-%m-%d"),
         'name'          : patient['name'],
         'mobile'        : patient['mobile'],

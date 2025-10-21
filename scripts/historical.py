@@ -68,7 +68,7 @@ for _, row in merged.iterrows():
     )
 
     record = {
-        'type'          : 'historical',
+        'type'          : 'hist',
         # 'date_joined'   : row['reg_time'].to_pydatetime().strftime("%Y-%m-%d"),
         'date_joined'   : entry_time.strftime('%Y-%m-%d'),
         'name'          : row['name'] if pd.notna(row['name']) else "",
