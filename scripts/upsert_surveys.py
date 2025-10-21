@@ -1,7 +1,9 @@
 from config.configs import REMOTE_MONGO_CONFIG
+from database.MongoDBConnector import MongoDBConnector
 from utils.surveys import *
 
 import argparse
+import asyncio
 import pandas as pd
 from datetime import datetime
 from pathlib import Path
@@ -15,9 +17,13 @@ pre_collection  = db["patient_presurvey"]
 post_collection = db["patient_postsurvey"]
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--mode", type=str, required=True, default="local")
 parser.add_argument('--date', type=str, required=False, default=datetime.today().strftime("%y%m%d"))
-date = parser.parse_args().date
+args = parser.parse_args()
+date = args.date
 print(f"Processing surveys for {date}")
+
+mongo = MongoDBConnector(mode=args.mode)
 
 ROOT    = Path(__file__).parent.parent
 PRE_IN  = ROOT / "datasets" / f"{date}_pre_survey.csv"
@@ -157,7 +163,7 @@ for _, row in df_pre.iterrows():
     mapped_data_pre.append(record)
 
 pre_contact_set = set() ; pre_added = 0
-
+pre_unique_records = []
 for record in mapped_data_pre:
 
     contact_number = record.get("mobile")
@@ -170,6 +176,7 @@ for record in mapped_data_pre:
         continue
 
     pre_contact_set.add(contact_number)
+    pre_unique_records.append(record)
 
     res = pre_collection.update_one(
         {"mobile": contact_number},
@@ -179,6 +186,14 @@ for record in mapped_data_pre:
 
     if res.upserted_id is not None or res.modified_count > 0:
         pre_added += 1
+
+asyncio.run(
+    mongo.upsert_documents(
+        pre_unique_records,
+        coll_name="patient_presurvey",
+        id_fields=["mobile"]
+    )
+)
 
 ######################################## POST-SURVEY ########################################
 
@@ -265,7 +280,7 @@ for _, row in df_post.iterrows():
     mapped_data_post.append(record)
 
 post_contact_set = set() ; post_added = 0
-
+post_unique_records = []
 for record in mapped_data_post:
 
     contact_number = record.get("mobile")
@@ -278,6 +293,7 @@ for record in mapped_data_post:
         continue
 
     post_contact_set.add(contact_number)
+    post_unique_records.append(record)
 
     res = post_collection.update_one(
         {"mobile": contact_number},
@@ -287,6 +303,14 @@ for record in mapped_data_post:
 
     if res.upserted_id is not None or res.modified_count > 0:
         post_added += 1
+
+asyncio.run(
+    mongo.upsert_documents(
+        post_unique_records,
+        coll_name="patient_postsurvey",
+        id_fields=["mobile"]
+    )
+)
 
 print(f"Upserted {pre_added} records into MongoDB collection 'patient_presurvey'")
 print(f"Upserted {post_added} records into MongoDB collection 'patient_postsurvey'")

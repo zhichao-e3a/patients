@@ -18,7 +18,7 @@ def main():
 
     mode = args.mode ; date = args.date
 
-    subprocess.run(['python', '-m', 'scripts.upsert_surveys', '--date', date], check=True)
+    subprocess.run(['python', '-m', 'scripts.upsert_surveys', '--mode', mode, '--date', date], check=True)
     subprocess.run(['python', '-m', 'scripts.recruited', '--mode', mode], check=True)
     subprocess.run(['python', '-m', 'scripts.historical', '--mode', mode], check=True)
 
