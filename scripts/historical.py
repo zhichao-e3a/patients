@@ -1,10 +1,9 @@
-import argparse
-
 from database.queries import HISTORICAL_QUERY
 from database.SQLDBConnector import SQLDBConnector
 from database.MongoDBConnector import MongoDBConnector
 from utils.consolidate import *
 
+import argparse
 import asyncio
 import pandas as pd
 from pathlib import Path
@@ -20,10 +19,13 @@ ROOT                = Path(__file__).parent.parent
 hist_df             = pd.read_excel(ROOT / "datasets" / "historical_metadata.xlsx")
 hist_df['mobile']   = hist_df['mobile'].astype(str)
 
+print(f"[Excel] {len(hist_df)} patients loaded")
+
 mobile_query_str = ",".join([f"'{i}'" for i in hist_df["mobile"].tolist()])
 
 hist_sql = sql.query_to_dataframe(query=HISTORICAL_QUERY.format(mobile_query_str=mobile_query_str))
-print(f"{len(hist_sql)} patient records fetched")
+
+print(f"[MySQL] {len(hist_sql)} measurements fetched")
 
 hist_pivot = hist_sql.pivot(
     index=[i for i in hist_sql.columns if i not in ['record_type', 'record_answer']],
@@ -31,17 +33,24 @@ hist_pivot = hist_sql.pivot(
     values='record_answer'
 ).reset_index()
 
+print(f"[MySQL] {len(hist_pivot)} patients fetched")
+
 merged = hist_df.merge(hist_pivot, on='mobile', how='left')
 
 new_records = []
 for _, row in merged.iterrows():
 
+    # Get ga_entry time
     basic_info_str  = row['basic_info']
     conclusion_str  = row['conclusion'] if pd.notna(row['conclusion']) else None
     ga_entry        = extract_gest_age(conclusion_str, basic_info_str)
+
+    # Get ga_exit time (ADD, last measurement)
     entry_time      = row['earliest']
-    exit_time       = row['add']
-    ga_exit         = int(ga_entry + (exit_time - entry_time).days) if pd.notna(exit_time) else None
+    exit_time_add   = row['add']
+    exit_time_last  = row['latest']
+    ga_exit_add     = ga_entry + (exit_time_add - entry_time).days if pd.notna(exit_time_add) else None
+    ga_exit_last    = ga_entry + (exit_time_last - entry_time).days if pd.notna(exit_time_last) else None
 
     # 0='0 pregnancies', 1='1 pregnancies', 2='2 pregnancies', 3='>2 pregnancies'
     # Count current pregnancy as well so treat 0 and 1 as same
@@ -60,22 +69,24 @@ for _, row in merged.iterrows():
 
     record = {
         'type'          : 'historical',
-        'date_joined'   : row['reg_time'].to_pydatetime().strftime("%Y-%m-%d"),
-        'name'          : row['name'] if pd.notna(row['name']) else None,
+        # 'date_joined'   : row['reg_time'].to_pydatetime().strftime("%Y-%m-%d"),
+        'date_joined'   : entry_time.strftime('%Y-%m-%d'),
+        'name'          : row['name'] if pd.notna(row['name']) else "",
         'mobile'        : row['mobile'],
-        'age'           : str(int(row['age'])) if pd.notna(row['age']) else None,
+        'age'           : str(int(row['age'])) if pd.notna(row['age']) else "",
         'ga_entry'      : ga_entry,
-        'ga_exit'       : ga_exit,
-        'bmi'           : bmi if pd.notna(bmi) else None,
-        'edd'           : row['edd'].strftime("%Y-%m-%d") if pd.notna(row['edd']) else None,
+        'ga_exit_add'   : ga_exit_add,
+        'ga_exit_last'  : ga_exit_last if ga_exit_last <= ga_exit_add else ga_exit_add,
+        'bmi'           : bmi if pd.notna(bmi) else 0,
+        'edd'           : row['edd'].strftime("%Y-%m-%d") if pd.notna(row['edd']) else "",
         'had_pregnancy' : 1 if (preg_count > 1) else 0,
         'had_preterm'   : 1 if had_preterm == 0 else 0,
         'had_surgery'   : 1 if had_surgery == 0 else 0,
         'gdm'           : 1 if gdm == 0 else 0,
         'pih'           : 1 if pih == 0 else 0,
         'delivery_type' : row['delivery_type'],
-        'add'           : row['add'].to_pydatetime().strftime("%Y-%m-%d %H:$M"),
-        'onset'         : row['onset'].to_pydatetime().strftime("%Y-%m-%d %H:$M") if pd.notna(row['onset']) else None
+        'add'           : row['add'].to_pydatetime().strftime("%Y-%m-%d %H:%M"),
+        'onset'         : row['onset'].to_pydatetime().strftime("%Y-%m-%d %H:%M") if pd.notna(row['onset']) else ""
     }
 
     new_records.append(record)

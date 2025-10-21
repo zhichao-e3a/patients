@@ -51,6 +51,22 @@ AND r.utime > '{last_utime}'
 ;
 """
 
+RECRUITED_QUERY = """
+SELECT
+u.mobile,
+FROM_UNIXTIME(r.start_ts) AS m_time,
+r.basic_info,
+r.conclusion
+FROM extant_future_user.user AS u
+JOIN extant_future_data.origin_data_record AS r
+ON u.id = r.user_id
+WHERE
+u.mobile
+IN
+({mobile_query_str})
+;
+"""
+
 HISTORICAL_QUERY = """
 SELECT
 u.reg_time,

@@ -2,6 +2,7 @@ import json
 import numpy as np
 import pandas as pd
 from typing import Any, Optional
+from datetime import datetime
 
 # ---------- Helper Functions ----------
 def parse_date_ymd(x: Any) -> pd.Timestamp:
@@ -16,7 +17,7 @@ def delivery_type_map(s: Any) -> Any:
         return "c-section"
     if "紧急剖腹产" in s:
         return "emergency c-section"
-    return np.nan
+    return None
 
 def bmi_choose_weight_kg(height_cm: Any, weight_val: Any) -> Optional[float]:
     """
@@ -70,7 +71,7 @@ def ga_simple_to_float(x: Any) -> float:
         print(e)
         return np.nan
 
-def compute_onset_from_posts_row(row: pd.Series) -> str:
+def compute_onset(row: pd.Series) -> str:
     """Onset = parsed water_break_datetime, else ''."""
 
     def parse_water_break_datetime(wb: Any) -> Optional[pd.Timestamp]:

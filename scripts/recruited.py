@@ -1,15 +1,18 @@
-import argparse
-
+from database.queries import RECRUITED_QUERY
+from database.SQLDBConnector import SQLDBConnector
 from database.MongoDBConnector import MongoDBConnector
 from utils.consolidate import *
 
+import argparse
 import asyncio
+import numpy as np
 import pandas as pd
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", required=True, choices=['local', 'remote'])
 mode = parser.parse_args().mode
 
+sql   = SQLDBConnector()
 mongo = MongoDBConnector(mode=mode)
 
 pre_docs = asyncio.run(
@@ -17,15 +20,13 @@ pre_docs = asyncio.run(
         "patient_presurvey",
         projection = {
             "_id"                   : 0,
-            "date_joined"           : 1,
             "name"                  : 1,
             "mobile"                : 1,
             "age"                   : 1,
-            "ga_entry"              : 1,
             "curr_height"           : 1,
             "pre_weight"            : 1,
             "edd"                   : 1,
-            "had_pregnancy"           : 1,
+            "had_pregnancy"         : 1,
             "had_preterm"           : 1,
             "had_surgery"           : 1,
             "diagnosed_conditions"  : 1,
@@ -42,50 +43,150 @@ post_docs = asyncio.run(
             "delivery_type"         : 1,
             "add"                   : 1,
             "delivery_time"         : 1,
-            "ga_exit"               : 1,
             "water_break_datetime"  : 1
         }
     )
 )
 
-print(f"{len(pre_docs)} pre-survey records retrieved ; {len(post_docs)} post-survey records retrieved")
-
 pre = pd.DataFrame(pre_docs) ; post = pd.DataFrame(post_docs)
 
-# Construct new dataframe for pre-survey fields
-new_pre = pd.DataFrame()
+mobile_query_str    = ",".join([f"'{i['mobile']}'" for i in pre_docs])
+measurements_df     = sql.query_to_dataframe(query=RECRUITED_QUERY.format(mobile_query_str=mobile_query_str))
+measurements_df     = measurements_df.sort_values(["mobile", "m_time"])
+grouped_df          = measurements_df.groupby("mobile")
 
-new_pre["date_joined"]      = pre["date_joined"]
-new_pre["name"]             = pre["name"]
-new_pre["mobile"]           = pre["mobile"]
-new_pre["age"]              = pre["age"]
-new_pre["ga_entry"]         = pre["ga_entry"]
-new_pre["bmi"]              = pre.apply(
-    lambda x: bmi_choose_weight_kg(x.get("curr_height"), x.get("pre_weight")),
-    axis=1
-)
-new_pre["edd"]              = pre["edd"]
-new_pre["had_pregnancy"]    = pre["had_pregnancy"].apply(lambda s: 1 if (s == "Yes") else 0)
-new_pre["had_preterm"]      = pre["had_preterm"].apply(lambda s: 1 if (s == "Yes") else 0)
-new_pre["had_surgery"]      = pre["had_surgery"].apply(lambda s: 1 if (s == "Yes") else 0)
-new_pre["gdm"]              = pre["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠糖尿病"))
-new_pre["pih"]              = pre["diagnosed_conditions"].apply(lambda s: flag_contains_1_0(s, "妊娠高血压"))
+"""
+Not all patients in pre-survey will be present in database
+Patients that will not be queried:
+- Did not register on Modoo (no patient data -> no measurement data)
+- Did not use Modoo products (no measurement data)
+"""
+queried_mobile_set = set([mobile for mobile, _ in grouped_df])
 
-# Construct new dataframe for post-survey fields
-new_post = pd.DataFrame()
+print(f"[Mongo] {len(pre_docs)} pre-survey records")
 
-new_post["mobile"]          = post["mobile"]
-new_post["ga_exit"]         = post["ga_exit"]
-new_post["delivery_type"]   = post["delivery_type"].apply(delivery_type_map)
-new_post["add"]             = post.apply(
-    lambda r: f"{r.get("add")} {r.get("delivery_time")}", axis=1
-)
-new_post["onset"]           = post.apply(compute_onset_from_posts_row, axis=1)
+print(f"[Mongo] {len(post_docs)} post-survey records")
 
-merged          = new_pre.merge(new_post, on="mobile", how="left")
-merged["type"]  = "recruited"
+for d in pre_docs:
 
-new_records = merged.replace({np.nan: None}).to_dict("records")
+    if d['mobile']  not in queried_mobile_set:
+        print(f"[MySQL] {d['mobile']}: Not registered on Modoo / No measurement data")
+
+print(f'[MySQL] {len(queried_mobile_set)} patients from MySQL')
+
+merged = pre.merge(post, on="mobile", how="left")
+merged.replace({np.nan: None}, inplace=True)
+
+new_records = []
+for _, patient in merged.iterrows():
+
+    mobile = patient["mobile"]
+    if mobile not in queried_mobile_set:
+        continue
+
+    patient_measurements_df = grouped_df.get_group(patient["mobile"])
+    earliest_iter = patient_measurements_df.iterrows() ; ga_entry_iter = patient_measurements_df.iterrows()
+
+    # Get ADD (could be None)
+    add = f"{patient["add"]} {patient["delivery_time"]}" if patient["add"] else None
+
+    # Get the earliest measurement (cannot be None)
+    earliest_idx, earliest_m = next(earliest_iter)
+    earliest = earliest_m['m_time']
+
+    # Get the ga_entry for earliest measurement (cannot be None)
+    ga_entry_idx, ga_entry_m = next(ga_entry_iter)
+    basic_info_str  = ga_entry_m['basic_info']
+    conclusion_str  = ga_entry_m['conclusion'] if pd.notna(ga_entry_m['conclusion']) else None
+    ga_entry_temp   = extract_gest_age(conclusion_str, basic_info_str)
+
+    # Get ga_entry (cannot be None)
+    ga_entry_mismatch = False
+    while ga_entry_temp is None:
+
+        ga_entry_mismatch = True
+
+        ga_entry_idx, ga_entry_m = next(ga_entry_iter)
+
+        basic_info_str  = ga_entry_m['basic_info']
+        conclusion_str  = ga_entry_m['conclusion'] if pd.notna(ga_entry_m['conclusion']) else None
+        ga_entry_temp   = extract_gest_age(conclusion_str, basic_info_str)
+
+    if ga_entry_mismatch:
+        ga_entry = ga_entry_temp - (ga_entry_m['m_time']-earliest).days
+    else:
+        ga_entry = ga_entry_temp
+
+    # Calculate ga_exit_add, ga_exit_last if ADD present ; Recalculate the earliest if needed
+    ga_exit_add = None ; ga_exit_last = None
+    if add is not None:
+
+        # Get Delivery Exit Time and Last Exit Time (None if ADD is None)
+        exit_time_add   = datetime.strptime(add, "%Y-%m-%d %H:%M") if add else None
+        exit_time_last  = patient_measurements_df['m_time'].iloc[-1] if add else None
+
+        # If the measurement date is too early (indicates previous pregnancy, and the earliest measurement is wrong)
+        if (exit_time_add-earliest).days > 280:
+
+            print(f"[Retry] {mobile}: Recalculate earliest measurement")
+
+            # Recalculate the earliest measurement if the initial one was wrong
+            while (exit_time_add-earliest).days > 280:
+                earliest_idx, earliest_m = next(earliest_iter)
+                earliest = earliest_m['m_time']
+
+            # Iterate until ga_entry and earliest meet
+            while ga_entry_idx < earliest_idx:
+                ga_entry_idx, ga_entry_m = next(ga_entry_iter)
+            while earliest_idx < ga_entry_idx:
+                earliest_idx, earliest_m = next(earliest_iter)
+
+            basic_info_str  = ga_entry_m['basic_info']
+            conclusion_str  = ga_entry_m['conclusion'] if pd.notna(ga_entry_m['conclusion']) else None
+            ga_entry_temp   = extract_gest_age(conclusion_str, basic_info_str)
+
+            ga_entry_mismatch = False
+            while ga_entry_temp is None:
+
+                ga_entry_mismatch = True
+
+                ga_entry_idx, ga_entry_m = next(ga_entry_iter)
+
+                basic_info_str  = ga_entry_m['basic_info']
+                conclusion_str  = ga_entry_m['conclusion'] if pd.notna(ga_entry_m['conclusion']) else None
+                ga_entry_temp   = extract_gest_age(conclusion_str, basic_info_str)
+
+            if ga_entry_mismatch:
+                ga_entry = ga_entry_temp - (ga_entry_m['m_time'] - earliest).days
+            else:
+                ga_entry = ga_entry_temp
+
+        # Get ga_exit_add, ga_exit_last
+        ga_exit_add  = ga_entry + (exit_time_add-earliest).days
+        ga_exit_last = ga_entry + (exit_time_last-earliest).days
+
+    record = {
+        'type'          : 'recruited',
+        'date_joined'   : earliest.strftime("%Y-%m-%d"),
+        'name'          : patient['name'],
+        'mobile'        : patient['mobile'],
+        'age'           : patient['age'],
+        'ga_entry'      : ga_entry,
+        'ga_exit_add'   : ga_exit_add,
+        'ga_exit_last'  : ga_exit_last,# if ga_exit_last <= ga_exit_add else ga_exit_add,
+        'bmi'           : bmi_choose_weight_kg(patient['curr_height'], patient['pre_weight']),
+        'edd'           : patient['edd'],
+        'had_pregnancy' : 1 if patient['had_pregnancy'] == 'Yes' else 0,
+        'had_preterm'   : 1 if patient['had_preterm'] == 'Yes' else 0,
+        'had_surgery'   : 1 if patient['had_surgery'] == 'Yes' else 0,
+        'gdm'           : flag_contains_1_0(patient['diagnosed_conditions'], "妊娠糖尿病"),
+        'pih'           : flag_contains_1_0(patient['diagnosed_conditions'], "妊娠高血压"),
+        'delivery_type' : delivery_type_map(patient['delivery_type']),
+        'add'           : add,
+        'onset'         : compute_onset(patient) if add else None
+    }
+
+    new_records.append(record)
 
 asyncio.run(
     mongo.upsert_documents(
