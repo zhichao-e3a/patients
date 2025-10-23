@@ -8,6 +8,8 @@ import asyncio
 import pandas as pd
 from pathlib import Path
 
+print("---HISTORICAL---")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", type=str, required=True, choices=["local", "remote"])
 mode = parser.parse_args().mode
@@ -71,14 +73,14 @@ for _, row in merged.iterrows():
         'type'          : 'hist',
         # 'date_joined'   : row['reg_time'].to_pydatetime().strftime("%Y-%m-%d"),
         'date_joined'   : entry_time.strftime('%Y-%m-%d'),
-        'name'          : row['name'] if pd.notna(row['name']) else "",
+        'name'          : row['name'] if pd.notna(row['name']) else None,
         'mobile'        : row['mobile'],
-        'age'           : str(int(row['age'])) if pd.notna(row['age']) else "",
+        'age'           : int(row['age']) if pd.notna(row['age']) else None,
         'ga_entry'      : ga_entry,
         'ga_exit_add'   : ga_exit_add,
         'ga_exit_last'  : ga_exit_last if ga_exit_last <= ga_exit_add else ga_exit_add,
-        'bmi'           : bmi if pd.notna(bmi) else 0,
-        'edd'           : row['edd'].strftime("%Y-%m-%d") if pd.notna(row['edd']) else "",
+        'bmi'           : bmi if pd.notna(bmi) else None,
+        'edd'           : row['edd'].strftime("%Y-%m-%d") if pd.notna(row['edd']) else None,
         'had_pregnancy' : 1 if (preg_count > 1) else 0,
         'had_preterm'   : 1 if had_preterm == 0 else 0,
         'had_surgery'   : 1 if had_surgery == 0 else 0,
@@ -86,7 +88,7 @@ for _, row in merged.iterrows():
         'pih'           : 1 if pih == 0 else 0,
         'delivery_type' : row['delivery_type'],
         'add'           : row['add'].to_pydatetime().strftime("%Y-%m-%d %H:%M"),
-        'onset'         : row['onset'].to_pydatetime().strftime("%Y-%m-%d %H:%M") if pd.notna(row['onset']) else ""
+        'onset'         : row['onset'].to_pydatetime().strftime("%Y-%m-%d %H:%M") if pd.notna(row['onset']) else None
     }
 
     new_records.append(record)

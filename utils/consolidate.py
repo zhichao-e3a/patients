@@ -83,7 +83,7 @@ def compute_onset(row: pd.Series) -> str:
         return t if pd.notna(t) else None
 
     ts = parse_water_break_datetime(row.get("water_break_datetime"))
-    return ts.strftime("%Y-%m-%d %H:%M") if ts is not None else ""
+    return ts.strftime("%Y-%m-%d %H:%M") if ts is not None else None
 
 ######################################## HISTORICAL ########################################
 

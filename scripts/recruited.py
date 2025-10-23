@@ -8,6 +8,8 @@ import asyncio
 import numpy as np
 import pandas as pd
 
+print("---RECRUITED---")
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", required=True, choices=['local', 'remote'])
 mode = parser.parse_args().mode
@@ -168,14 +170,14 @@ for _, patient in merged.iterrows():
     record = {
         'type'          : 'rec',
         'date_joined'   : earliest.strftime("%Y-%m-%d"),
-        'name'          : patient['name'],
+        'name'          : patient['name'] if pd.notna(patient['name']) else None,
         'mobile'        : patient['mobile'],
-        'age'           : patient['age'],
+        'age'           : int(patient['age']) if pd.notna(patient['age']) else None,
         'ga_entry'      : ga_entry,
         'ga_exit_add'   : ga_exit_add,
         'ga_exit_last'  : ga_exit_last,# if ga_exit_last <= ga_exit_add else ga_exit_add,
         'bmi'           : bmi_choose_weight_kg(patient['curr_height'], patient['pre_weight']),
-        'edd'           : patient['edd'],
+        'edd'           : patient['edd'] if patient['edd'] else None,
         'had_pregnancy' : 1 if patient['had_pregnancy'] == 'Yes' else 0,
         'had_preterm'   : 1 if patient['had_preterm'] == 'Yes' else 0,
         'had_surgery'   : 1 if patient['had_surgery'] == 'Yes' else 0,
