@@ -69,7 +69,6 @@ IN
 
 HISTORICAL_QUERY = """
 SELECT
-u.reg_time,
 uu.name,
 u.mobile,
 uu.age,

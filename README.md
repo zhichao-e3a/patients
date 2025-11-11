@@ -9,21 +9,28 @@ The main entrypoint is [`main.py`](./main.py), which runs the full data ingestio
 
 ```bash
 patients/
+│
 ├─ config/
 │  ├─ .env                 # Credentials for Navicat, MongoDB
 │  ├─ configs.py           # Configurations for Navicat, MongoDB
 │  └─ ef_aliyun_pem        # Navicat SSH Key
+│
 ├─ database/
 │  ├─ MongoDBConnector.py  # MongoDB connector class
 │  ├─ SQLDBConnector.py    # MySQL connector class
 │  └─ queries.py           # Parameterized SQL queries
+│
 ├─ datasets/               # Pre and Post survey data
+│
 ├─ scripts/
 │  ├─ upsert_surveys.py    # Upserts latest survey responses in ./datasets
 │  ├─ recruited.py         # Upserts recruited patients
 │  └─ historical.py        # Upserts historical patients
+│
 ├─ utils/                  # Utility modules
+│
 ├─ main.py                 # Entrypoint orchestrating all scripts
+│
 └─ requirements.txt        # Dependencies
 ```
 
