@@ -6,6 +6,7 @@ r.start_ts,
 r.start_test_ts,
 r.contraction_url,
 r.hb_baby_url,
+-- r.raw_fetal_url,
 r.basic_info,
 r.conclusion,
 tt.expected_born_date,
@@ -35,9 +36,9 @@ r.start_ts,
 r.start_test_ts,
 r.contraction_url,
 r.hb_baby_url,
+-- r.raw_fetal_url,
 r.basic_info,
-r.conclusion,
-r.utime
+r.conclusion
 FROM
 extant_future_user.user AS uu
 INNER JOIN
@@ -47,11 +48,10 @@ AND r.contraction_url <> ''
 AND r.hb_baby_url <> ''
 AND uu.mobile IN ({numbers})
 AND r.start_ts BETWEEN UNIX_TIMESTAMP({start}) AND UNIX_TIMESTAMP({end})
-AND r.utime > '{last_utime}'
 ;
 """
 
-RECRUITED_QUERY = """
+RECRUITED_PATIENTS_QUERY = """
 SELECT
 u.mobile,
 FROM_UNIXTIME(r.start_ts) AS m_time,
@@ -67,7 +67,7 @@ IN
 ;
 """
 
-HISTORICAL_QUERY = """
+HISTORICAL_PATIENTS_QUERY = """
 SELECT
 uu.name,
 u.mobile,
