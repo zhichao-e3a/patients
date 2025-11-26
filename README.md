@@ -31,6 +31,8 @@ patients/
 │
 ├─ main.py                 # Entrypoint orchestrating all scripts
 │
+├─ checK_patient.ipynb     # Notebook to check patient eligibity
+│
 └─ requirements.txt        # Dependencies
 ```
 
@@ -47,15 +49,28 @@ pip install -r requirements.txt
 
 ## ▶️ Running the Main Script
 
-```bash
-python main.py --mode remote --date {yymmdd}
-```
+### Pre-requisites
 
-`--mode`: 'remote' or 'local' 
+* Create `./datasets` directory at the root level if it doesn't exist
 
-`--date`: Optional ; provide in 'yymmdd' format, defaults to today
+* Recruited Patients
+
+  * Ensure that pre and post survey CSV data files are present in `./datasets`, named `{yymmdd}_pre_survey.csv` and `{yymmdd}_post_survey.csv` respectively
+
+  * Ensure consistent data format in pre and post survey files (e.g. change '38周2天' to '38.2')
+
+* Historical Patients
+
+  * Ensure that historical patient metadata file is present in `./datasets` named `historical_metadata.xlsx`
 
 ### Execution
+
+```bash
+python main.py --mode remote --date {yymmdd}
+
+# --mode: remote | local
+# --date: optional, defaults to today ('yymmdd' format)
+```
 
 `main.py` is the **entrypoint** and executes these scripts in sequence:
 
