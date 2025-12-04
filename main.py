@@ -1,16 +1,13 @@
 import argparse
 import subprocess
 
-from pathlib import Path
 from datetime import datetime
-
-ROOT    = Path(__file__).resolve().parent
 
 def main():
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--mode', type=str, required=True, choices=['local', 'remote'])
+    parser.add_argument('--mode', type=str, required=True, choices=['local', 'remote', 'test'])
 
     parser.add_argument('--date', type=str, required=False, default=datetime.now().strftime('%y%m%d'))
 

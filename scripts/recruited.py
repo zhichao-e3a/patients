@@ -11,7 +11,7 @@ import pandas as pd
 async def recruited():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", required=True, choices=['local', 'remote'])
+    parser.add_argument("--mode", required=True, choices=['local', 'remote', 'test'])
     mode = parser.parse_args().mode
 
     print(f"---RECRUITED ({mode})---")

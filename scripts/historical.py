@@ -11,7 +11,7 @@ from pathlib import Path
 async def historical():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--mode", type=str, required=True, choices=["local", "remote"])
+    parser.add_argument("--mode", type=str, required=True, choices=["local", "remote", 'test'])
     mode = parser.parse_args().mode
 
     print(f"---HISTORICAL ({mode})---")
